@@ -5,3 +5,4 @@ data/raw/
 out/
 *.pdf
 !expected/**/*.pdf
+.DS_Store

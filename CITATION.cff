@@ -1,13 +1,13 @@
 cff-version: 1.2.0
 message: "If you use this code, please cite the article below."
 title: "dlrverify: reproduction code for a review of probabilistic line-rating verification"
-version: 0.9.0
+version: 1.0.0
 license: MIT
 authors:
   - family-names: "Cárdenas-Barrera"
     given-names: "Julian L."
     affiliation: "University of New Brunswick"
-    # orcid: "https://orcid.org/0000-0000-0000-000X"   # TODO
+    # orcid: "https://orcid.org/0000-0002-3674-3995"   # TODO
 preferred-citation:
   type: article
   title: "From Predictive Distributions to Operational Line Ratings: A Review of Uncertainty Quantification, Verification, and Risk-Based Use of Ambient-Adjusted and Dynamic Ratings"
