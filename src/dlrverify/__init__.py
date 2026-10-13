@@ -2,4 +2,4 @@
 from .ieee738 import ampacity, k_angle, DRAKE  # noqa: F401
 from . import vtests  # noqa: F401
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"

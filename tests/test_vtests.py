@@ -46,3 +46,14 @@ def test_hac_widens_for_overlapping_hits():
     p_iid = vt.uc_hac(I, 0.01, 0)[1]
     p_hac = vt.uc_hac(I, 0.01, 23)[1]
     assert p_hac > p_iid
+
+
+def test_upper_bound_reduces_to_clopper_pearson_and_widens_with_dependence():
+    rng = np.random.default_rng(5)
+    I = (rng.random(5000) < 0.01).astype(int)
+    ub0, n0 = vt.upper_bound_eff(I, 0)
+    assert n0 == 5000
+    assert abs(ub0 - vt.clopper_pearson(I.sum(), 5000, conf=0.90)[1]) < 1e-12
+    Ic = np.repeat(I[:500], 10)                      # same rate, hits in runs of 10
+    ubc, nc = vt.upper_bound_eff(Ic, 95)
+    assert nc < 1000 and ubc > vt.upper_bound_eff(Ic, 0)[0]

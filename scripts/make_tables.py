@@ -1,10 +1,10 @@
-"""Write the LaTeX body rows of Tables 6-8 from results.json files (v1.1).
+"""Write the LaTeX body rows of Tables 6-9 from results.json files (v1.2).
 Usage: make_tables.py <jena dir> <m2_ew dir> <m2_ns dir> <outdir>"""
 import sys, json
 dirs, out = sys.argv[1:4], sys.argv[4]
 CASES = [json.load(open(f"{d}/results.json"))["results"] for d in dirs]
 REF = [("Static", "Static (annual)"), ("Seasonal", "Seasonal (4 seasons)"),
-       ("AAR", "AAR, no margin"), ("AAR881", "AAR, 10\\,$^\\circ$F margin")]
+       ("AAR", "AAR (realised $T$), no margin"), ("AAR881", "AAR (realised $T$), $+10$\\,$^\\circ$F")]
 RULES = [("QR", "QR"), ("QR+tracking", "QR + tracking"), ("Margin", "Median $-$ margin"),
          ("Input", "Input q., persisted"), ("Input45", "Input q., 45$^\\circ$"),
          ("ProbAAR", "Prob.\\ AAR")]
@@ -32,7 +32,7 @@ for m, lab in REF:
 open(f"{out}/table6_reference_rows.tex", "w").write("\n".join(rows) + "\n")
 
 for a, fn, cols in [(0.01, "table7_a01_rows.tex", ("rate", "p_uc", "p_dq", "gain")),
-                    (0.05, "table8_a05_rows.tex", ("rate", "p_uc", "gain"))]:
+                    (0.05, "table8_a05_rows.tex", ("rate", "p_uc", "p_dq", "gain"))]:
     rows = []
     for h in [1, 24]:
         rows.append("\\midrule")
@@ -41,8 +41,16 @@ for a, fn, cols in [(0.01, "table7_a01_rows.tex", ("rate", "p_uc", "p_dq", "gain
             for R in CASES:
                 r = get(R, m, h, a)
                 for c in cols:
-                    cells.append(f"{r['rate']*100:.2f}" if c == "rate" else
+                    cells.append(f"{r['rate']*100:.2f} ({r['ucb95']*100:.2f})" if c == "rate" else
                                  (g(r["gain_vs_static"]) if c == "gain" else p(r[c])))
             rows.append(f"{lab} & {h} & " + " & ".join(cells) + " \\\\")
     open(f"{out}/{fn}", "w").write("\n".join(rows[1:]) + "\n")
-print("wrote table6_reference_rows.tex, table7_a01_rows.tex, table8_a05_rows.tex")
+# Table 9: exceedance frequency at h = 1, alpha = 0.01 against three reference definitions
+SUB = [json.load(open(f"{d}/subhourly.json")) for d in dirs]
+rows = []
+for k, lab in [("QR", "QR"), ("QR+tracking", "QR + tracking"), ("Margin", "Median $-$ margin"),
+               ("ProbAAR", "Prob.\\ AAR"), ("AAR881", "AAR (realised $T$), $+10$\\,$^\\circ$F")]:
+    cells = [f"{S['rules'][k][c]*100:.2f}" for S in SUB for c in ("hourly", "mean10", "min10")]
+    rows.append(lab + " & " + " & ".join(cells) + " \\\\")
+open(f"{out}/table9_reference_rows.tex", "w").write("\n".join(rows) + "\n")
+print("wrote table6_reference_rows.tex, table7_a01_rows.tex, table8_a05_rows.tex, table9_reference_rows.tex")

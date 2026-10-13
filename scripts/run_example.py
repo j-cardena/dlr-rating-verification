@@ -1,15 +1,16 @@
-"""Worked example: coverage back-test of probabilistic line ratings (v1.1: causal design).
+"""Worked example: coverage back-test of probabilistic line ratings (v1.2: causal design).
 
 Data: 10-min weather at the Max Planck Institute for Biogeochemistry station,
 Jena (Germany), 2020, as distributed with the Darts library (weather.csv).
 Line: hypothetical ACSR Drake, east-west axis, T_max = 75 C, elevation 155 m.
 Reference ampacity A_t: IEEE 738-2012 steady state from hourly-mean measured weather.
 
-Usage: python3 -I run_example.py <jena|m2> <data file> <outdir> [azimuth]
+Usage: python3 -I run_example.py <jena|m2> <data file> <outdir> [azimuth] [pre-test climatology file(s)]
 """
 import sys, json
 import numpy as np, pandas as pd
 import statsmodels.api as sm
+from scipy import stats
 from statsmodels.regression.quantile_regression import QuantReg
 from dlrverify.ieee738 import ampacity
 from dlrverify import vtests as vt
@@ -22,6 +23,8 @@ ELEV = {"jena": 155.0, "m2": 1855.0}[SITE]
 ALPHAS = [0.01, 0.05]
 HORIZONS = [1, 24]
 ETA = 10.0  # A, step of the online correction (fixed a priori)
+MC_REPS, MC_SEED = 999, 20261013   # Monte Carlo p-values at h > 1 (v1.2)
+UB_BANDWIDTH = 95                  # h, Bartlett bandwidth of the effective sample for the bound
 
 
 # ---------------------------------------------------------------- data
@@ -38,13 +41,18 @@ def _m2_columns(cols):
         out[hit[0]] = short
     return out
 
-def load(site, src):
-    """Hour-ending means of T, V, wind vector (u, v) and irradiance G."""
+def load(site, src, full=False):
+    """Hour-ending means of T, V, wind vector (u, v) and irradiance G. With full=True the
+    whole file is used (pre-test climatology files; several files separated by commas)."""
     if site == "jena":       # MPI-BGC Jena 2020, 10-min (Darts weather.csv)
-        raw = pd.read_csv(src)
-        raw["t"] = pd.to_datetime(raw["Date Time"], format="%d.%m.%Y %H:%M:%S")
-        raw = raw.set_index("t")
-        T, ws, wdeg, G = raw["T (degC)"], raw["wv (m/s)"], raw["wd (deg)"], raw["SWDR (W/m²)"]
+        raw = pd.concat([pd.read_csv(f, encoding="latin-1") if full else pd.read_csv(f)
+                         for f in src.split(",")])
+        col = lambda prefix: next(c for c in raw.columns if c.strip().startswith(prefix))
+        raw["t"] = pd.to_datetime(raw[col("Date Time")], format="%d.%m.%Y %H:%M:%S")
+        raw = raw.set_index("t").sort_index()
+        raw = raw[~raw.index.duplicated()]
+        num = lambda prefix: pd.to_numeric(raw[col(prefix)], errors="coerce").where(lambda x: x > -9000)
+        T, ws, wdeg, G = num("T (degC)"), num("wv (m/s)"), num("wd (deg)"), num("SWDR")
         span = ("2020-01-01 01:00", "2020-12-31 23:00")
     else:                    # NREL NWTC M2 tower, 1-min, MIDC export (MST)
         raw = pd.read_csv(src)
@@ -60,7 +68,9 @@ def load(site, src):
     u, v = ws * np.sin(wd), ws * np.cos(wd)
     agg = pd.DataFrame({"T": T, "V": ws, "u": u, "v": v, "G": G}).resample(
         "1h", label="right", closed="right").mean()
-    agg = agg.loc[span[0]:span[1]].interpolate(limit=3, limit_area="inside")
+    if not full:
+        agg = agg.loc[span[0]:span[1]]
+    agg = agg.interpolate(limit=3, limit_area="inside")
     # keep a complete hourly index: lags and leads must be time-aligned across data gaps;
     # rows with missing inputs are dropped later, after lags are formed
     return agg
@@ -83,13 +93,25 @@ hours = agg.index
 STATIC = float(ampacity(30.0, 0.61, 90.0, 1000.0, Tmax=TMAX, elev=ELEV))
 SUN = lambda day: np.where(day == 1, 1000.0, 0.0)
 agg["season"] = (agg.index.month % 12) // 3
-TSEAS = agg.groupby("season")["T"].max()
+FIRST_TEST = {"jena": 202003, "m2": 202101}[SITE]   # models refitted monthly on all earlier data
+# Seasonal design temperatures use only data from before the test period (v1.2): the
+# highest hourly temperature of each season in a pre-test climatology file if one is given
+# (Jena: MPI-BGC roof station, 2017-2019), otherwise in the pre-test part of the record (M2:
+# 2020). A season with no pre-test data falls back to the full record and is flagged.
+CLIM = sys.argv[5] if len(sys.argv) > 5 else None
+if CLIM:
+    clim = load(SITE, CLIM, full=True)
+else:
+    clim = agg[(agg.index.year * 100 + agg.index.month) < FIRST_TEST]
+clim = clim.assign(season=(clim.index.month % 12) // 3)
+TSEAS = clim.groupby("season")["T"].max().reindex(range(4))
+SEAS_INSAMPLE = [int(k) for k in TSEAS.index[TSEAS.isna()]]
+TSEAS = TSEAS.fillna(agg.groupby("season")["T"].max())
 agg["SEAS"] = ampacity(agg["season"].map(TSEAS), 0.61, 90.0, 1000.0, Tmax=TMAX, elev=ELEV)
 agg["AAR"] = ampacity(agg["T"], 0.61, 90.0, SUN(agg["day"]), Tmax=TMAX, elev=ELEV)
 TF = agg["T"] * 9 / 5 + 32
 agg["T881"] = (np.ceil((TF + 10) / 5) * 5 - 32) * 5 / 9
 agg["AAR881"] = ampacity(agg["T881"], 0.61, 90.0, SUN(agg["day"]), Tmax=TMAX, elev=ELEV)
-FIRST_TEST = {"jena": 202003, "m2": 202101}[SITE]   # models refitted monthly on all earlier data
 
 
 # ---------------------------------------------------------------- features
@@ -171,18 +193,53 @@ def hourly(I, t):
     return s.reindex(pd.date_range(s.index.min(), s.index.max(), freq="h"), fill_value=0)
 
 
-def evaluate(R, df, a, h):
-    y = df["y"].values; I = (R > y).astype(int); T = len(I); x = int(I.sum())
-    L = max(h - 1, 0)
-    rate, p_uc_hac, ucb = vt.uc_hac(I, a, L)
-    lr_uc, p_uc = vt.kupiec(I, a)
-    ch = vt.christoffersen(I, a)
+def statistics(I, df, a, h):
+    """HAC coverage z and dynamic quantile W for a hit series aligned with df."""
+    T = len(I); L = max(h - 1, 0)
+    p = I.mean(); H = I - a; v0 = a * (1 - a)
+    for k in range(1, L + 1):
+        v0 += 2 * (1 - k / (L + 1)) * (H[k:] @ H[:-k]) / T
+    z = (p - a) / np.sqrt(max(v0, 1e-12) / T)
     tt = pd.DatetimeIndex(df["t_target"].values)
     Is = pd.Series(I, index=tt)
     lag = lambda k: Is.reindex(tt - pd.Timedelta(hours=k)).fillna(0).values
     lowV = (df["V0"].values < 1.0).astype(float)          # regime known at issue time
     X = np.column_stack([np.ones(T), lag(h), lag(2 * h), lowV, df["y_day"].values])
-    _, p_dq = vt.dq_hac(I, a, X, L)
+    W, p_dq = vt.dq_hac(I, a, X, L)
+    return abs(z), W, p_dq
+
+
+def mc_null(df, a, h, reps=MC_REPS):
+    """Null distribution of the HAC statistics for h-step forecasts issued hourly (Dufour's
+    Monte Carlo test). Under H0 the hits have rate a and the dependence of overlapping
+    forecasts: I = 1{z < Phi^-1(a)} with z a normalised MA(h-1) of iid shocks on the hourly
+    grid of target times; regime and daylight regressors are the observed ones."""
+    rng = np.random.default_rng(MC_SEED + h + int(1000 * a))
+    tt = pd.DatetimeIndex(df["t_target"].values)
+    grid = pd.date_range(tt.min(), tt.max(), freq="h"); pos = grid.get_indexer(tt)
+    q = stats.norm.ppf(a); out = np.empty((reps, 2))
+    for r in range(reps):
+        e = rng.standard_normal(len(grid) + h - 1)
+        z = np.convolve(e, np.ones(h), "valid") / np.sqrt(h)
+        I = (z[pos] < q).astype(int)
+        out[r, 0], out[r, 1], _ = statistics(I, df, a, h)
+    return out
+
+
+def evaluate(R, df, a, h, null=None):
+    y = df["y"].values; I = (R > y).astype(int); T = len(I); x = int(I.sum())
+    L = max(h - 1, 0)
+    rate, p_uc_hac, _ = vt.uc_hac(I, a, L)
+    ucb, n_eff = vt.upper_bound_eff(I, UB_BANDWIDTH)
+    lr_uc, p_uc = vt.kupiec(I, a)
+    ch = vt.christoffersen(I, a)
+    zabs, W, p_dq_hac = statistics(I, df, a, h)
+    if null is not None:                                   # Monte Carlo p-values (h > 1)
+        p_uc_mc = (1 + np.sum(null[:, 0] >= zabs - 1e-12)) / (len(null) + 1)
+        p_dq = (1 + np.sum(null[:, 1] >= W - 1e-12)) / (len(null) + 1)
+    else:
+        p_uc_mc, p_dq = np.nan, p_dq_hac
+    tt = pd.DatetimeIndex(df["t_target"].values)
     rl = vt.runs(hourly(I, tt).values)
     hot = df["y_T"].values >= np.quantile(df["y_T"].values, 0.9)
     mag = (R[I == 1] - y[I == 1]) / y[I == 1] if x else np.array([np.nan])
@@ -191,8 +248,8 @@ def evaluate(R, df, a, h):
         for lo, hi in [(0, 1), (1, 2), (2, 3), (3, 99)]:
             m = (df[col].values >= lo) & (df[col].values < hi); n = int(m.sum()); k = int(I[m].sum())
             reg[f"{name}_{lo}_{hi}"] = dict(n=n, k=k, rate=k / max(n, 1))
-    return dict(T=T, x=x, rate=x / T, p_uc=p_uc if h == 1 else p_uc_hac, p_uc_kupiec=p_uc,
-                p_uc_hac=p_uc_hac, ucb95=ucb, p_ind=ch["p_ind"], p_dq=p_dq,
+    return dict(T=T, x=x, rate=x / T, p_uc=p_uc if h == 1 else p_uc_mc, p_uc_kupiec=p_uc,
+                p_uc_hac=p_uc_hac, p_uc_mc=p_uc_mc, p_dq_hac=p_dq_hac, ucb95=ucb, n_eff=n_eff, p_ind=ch["p_ind"], p_dq=p_dq,
                 episodes=int(rl.size), max_run=int(rl.max()) if rl.size else 0,
                 mag_med=float(np.nanmedian(mag)), mag_p95=float(np.nanpercentile(mag, 95)),
                 mean_R=float(R.mean()), gain_vs_static=float(R.mean() / STATIC - 1),
@@ -210,11 +267,12 @@ def main():
             f = causal(dfall, a)
             df = dfall.loc[f.index]
             f["QR+tracking"] = quantile_tracking(f["QR"].values, df["y"].values, df.index, a, h)
+            null = mc_null(df, a, h) if h > 1 else None
             meths = {"Static": np.full(len(df), STATIC), "Seasonal": df["y_SEAS"].values,
                      "AAR": df["y_AAR"].values, "AAR881": df["y_AAR881"].values}
             meths.update({k: f[k].values for k in RULES + ["InputRealDir"]})
             for name, R in meths.items():
-                r = evaluate(np.asarray(R, float), df, a, h); r.update(method=name, h=h, alpha=a)
+                r = evaluate(np.asarray(R, float), df, a, h, null); r.update(method=name, h=h, alpha=a)
                 results.append(r)
                 print(f"h={h:2d} a={a:.2f} {name:12s} x={r['x']:4d}/{r['T']} rate={r['rate']*100:5.2f}% "
                       f"pUC={r['p_uc']:.3f} ucb={r['ucb95']*100:5.2f}% pIND={r['p_ind']:.3f} pDQ={r['p_dq']:.3f} "
@@ -237,7 +295,8 @@ def main():
         R = ampacity(test["T881"], V, phi, SUN(test["day"]), Tmax=TMAX, elev=ELEV)
         sens[f"V{V}_phi{phi:.0f}"] = dict(rate=float((R > test["A"]).mean()),
                                           gain=float(R.mean() / STATIC - 1))
-    summary = dict(static=STATIC, seasonal_T=TSEAS.to_dict(), n_hours=int(len(ok)),
+    summary = dict(static=STATIC, seasonal_T=TSEAS.to_dict(), seasonal_source=CLIM or "pre-test record",
+                   seasonal_insample=SEAS_INSAMPLE, n_hours=int(len(ok)),
                    n_test_hours=int(len(test)), first_test_month=FIRST_TEST,
                    mean_wind=float(ok["V"].mean()), frac_lowwind=float((ok["V"] < 1).mean()),
                    static_exceed=float((STATIC > ok["A"]).mean()),

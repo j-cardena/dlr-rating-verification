@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use this code, please cite the article below."
 title: "dlrverify: reproduction code for a review of probabilistic line-rating verification"
-version: 1.1.0
-date-released: 2026-10-12
+version: 1.2.0
+date-released: 2026-10-13
 license: MIT
 authors:
   - family-names: "Cárdenas-Barrera"

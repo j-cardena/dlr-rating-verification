@@ -118,3 +118,20 @@ def dq_hac(I, a, X, L):
         S = S + (1 - k / (L + 1)) * (G + G.T)
     W = T * m @ np.linalg.pinv(S) @ m
     return W, stats.chi2.sf(W, g.shape[1])
+
+
+def upper_bound_eff(I, L=95, conf=0.95):
+    """One-sided upper confidence bound on the exceedance rate for a dependent hit sequence:
+    Clopper-Pearson bound computed with an effective sample size n_eff = T p(1-p) / v_LR,
+    where v_LR is the Bartlett long-run variance at bandwidth L (Korn and Graubard, 1998,
+    design-effect adjustment). With L = 0, n_eff = T and the exact Clopper-Pearson bound is
+    returned. Returns (bound, n_eff)."""
+    I = np.asarray(I, float); T = I.size; p = I.mean(); x = I.sum()
+    if x == 0:
+        return float(1 - (1 - conf) ** (1 / T)), float(T)
+    if L == 0:
+        return float(stats.beta.ppf(conf, x + 1, T - x)), float(T)
+    vlr = float(newey_west(I[:, None], L)[0, 0])
+    n_eff = min(T, T * p * (1 - p) / max(vlr, 1e-12))
+    x_eff = p * n_eff
+    return float(stats.beta.ppf(conf, x_eff + 1, n_eff - x_eff)), float(n_eff)

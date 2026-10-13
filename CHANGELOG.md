@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0 (2026-10)
+- Seasonal ratings without look-ahead: design temperatures from before the test period (M2: 2020;
+  Jena: MPI-BGC roof station 2017-2019, files `data/raw/mpi_roof_201[789]*.csv`). Jena seasonal
+  exceedance 0.16 % -> 0.11 %; M2 unchanged (2020 maxima equal the full-record maxima).
+- expected/ refreshed for v1.2.
+- Monte Carlo p-values (Dufour 2006; 999 null samples, overlap of h-1 hours) for the h = 24
+  coverage and dynamic quantile tests; asymptotic HAC values kept in results.json (p_uc_hac, p_dq_hac).
+- One-sided 95 % upper bound on the exceedance rate: Clopper-Pearson with a long-run-variance
+  effective sample (Bartlett, 95 h); new `vtests.upper_bound_eff`.
+- New `size_sim.py`: size of the coverage tests and coverage of the bound (Supplementary Table S2).
+- `diag_subhourly.py` covers both sites and writes subhourly.json; new Table 9 (reference definition).
+- Tables 7-8 report the bound; Table 8 adds the dynamic quantile test; AAR rows labelled "realised T".
+
 ## 1.1.0 (2026-10)
 - Causal evaluation (models refitted monthly on all earlier data) replaces leave-one-month-out.
 - New reference ratings: seasonal (four seasons) and AAR with a 10 F margin in 5 F steps; wind-assumption sensitivity.
