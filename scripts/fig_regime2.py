@@ -5,7 +5,7 @@ matplotlib.use("Agg"); import matplotlib.pyplot as plt
 from dlrverify import vtests as vt
 fa, la, fb, lb, out = sys.argv[1:6]
 bins = [0, 1, 2, 3, 99]; labels = ["<1", "1–2", "2–3", ">3"]
-meths = [("QR", "QR", "o"), ("QR+online", "QR + online corr.", "s"),
+meths = [("QR", "QR", "o"), ("QR+tracking", "QR + quantile tracking", "s"),
          ("Margin", "Median − margin", "^"), ("Input", "Input quantiles", "D")]
 fig, axs = plt.subplots(2, 2, figsize=(7.2, 5.6), sharey=True)
 rows = []
@@ -26,7 +26,7 @@ for r, (f, site) in enumerate([(fa, la), (fb, lb)]):
         ax.set_xticks(range(4)); ax.set_xticklabels(labels)
         if r == 1: ax.set_xlabel("Hourly mean wind speed (m/s)")
         ax.set_title(f"({'abcd'[2*r+c]}) {site}: {title}", fontsize=8.5)
-        ax.set_yscale("symlog", linthresh=1); ax.set_ylim(-0.08, 20)
+        ax.set_yscale("symlog", linthresh=1); ax.set_ylim(-0.08, 30)
         ax.set_yticks([0, 0.5, 1, 2, 5, 10, 20]); ax.set_yticklabels(["0", "0.5", "1", "2", "5", "10", "20"])
     axs[r, 0].set_ylabel("Exceedance frequency (%)")
 axs[0, 0].legend(fontsize=7, loc="upper right", frameon=False)

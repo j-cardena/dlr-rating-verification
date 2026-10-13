@@ -77,3 +77,44 @@ def kupiec_region(T, a, level=0.05):
     xs = np.arange(0, int(3 * a * T) + 20)
     ok = [x for x in xs if kupiec(np.r_[np.ones(x), np.zeros(T - x)], a)[1] >= level]
     return min(ok), max(ok)
+
+
+# ---------------------------------------------------------------- dependence-robust versions
+def newey_west(g, L):
+    """Bartlett-kernel long-run covariance of the rows of g (T x k), bandwidth L."""
+    g = np.atleast_2d(np.asarray(g, float).T).T
+    g = g - g.mean(0)
+    T = g.shape[0]; S = g.T @ g / T
+    for k in range(1, L + 1):
+        G = g[k:].T @ g[:-k] / T
+        S = S + (1 - k / (L + 1)) * (G + G.T)
+    return S
+
+
+def uc_hac(I, a, L):
+    """Unconditional coverage with a HAC variance for overlapping h-step forecasts
+    (bandwidth L >= h-1; lag-0 variance a(1-a) imposed under H0, autocovariances at lags
+    1..L from the data with Bartlett weights). Returns (rate, two-sided p for H0: rate = a,
+    one-sided 95% upper bound on the rate, using the data-based long-run variance)."""
+    I = np.asarray(I, float); T = I.size; p = I.mean(); H = I - a
+    v0 = a * (1 - a)
+    for k in range(1, L + 1):
+        v0 += 2 * (1 - k / (L + 1)) * (H[k:] @ H[:-k]) / T
+    z = (p - a) / np.sqrt(max(v0, 1e-12) / T)
+    v1 = float(newey_west(I[:, None], L)[0, 0])
+    return p, 2 * stats.norm.sf(abs(z)), p + 1.645 * np.sqrt(max(v1, p * (1 - p)) / T)
+
+
+def dq_hac(I, a, X, L):
+    """Dynamic quantile test as a moment test E[X_t (I_t - a)] = 0. The lag-0 covariance is
+    imposed under H0, a(1-a) X'X/T, as in Engle and Manganelli (2004); for overlapping
+    h-step forecasts the autocovariances at lags 1..L (L >= h-1) are added with Bartlett
+    weights (Newey-West). With L = 0 this is the Engle-Manganelli statistic."""
+    X = np.asarray(X, float); H = np.asarray(I, float) - a
+    g = X * H[:, None]; T = g.shape[0]; m = g.mean(0)
+    S = a * (1 - a) * X.T @ X / T
+    for k in range(1, L + 1):
+        G = g[k:].T @ g[:-k] / T
+        S = S + (1 - k / (L + 1)) * (G + G.T)
+    W = T * m @ np.linalg.pinv(S) @ m
+    return W, stats.chi2.sf(W, g.shape[1])
