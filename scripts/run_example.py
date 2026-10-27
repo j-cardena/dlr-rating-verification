@@ -1,4 +1,4 @@
-"""Worked example: coverage back-test of probabilistic line ratings (v1.2: causal design).
+"""Worked example: coverage back-test of probabilistic line ratings (v1.2.1: causal design).
 
 Data: 10-min weather at the Max Planck Institute for Biogeochemistry station,
 Jena (Germany), 2020, as distributed with the Darts library (weather.csv).
@@ -23,6 +23,7 @@ ELEV = {"jena": 155.0, "m2": 1855.0}[SITE]
 ALPHAS = [0.01, 0.05]
 HORIZONS = [1, 24]
 ETA = 10.0  # A, step of the online correction (fixed a priori)
+ETA_SENS = (5.0, 20.0)  # A, sensitivity of quantile tracking to its step (v1.2.1)
 MC_REPS, MC_SEED = 999, 20261013   # Monte Carlo p-values at h > 1 (v1.2)
 UB_BANDWIDTH = 95                  # h, Bartlett bandwidth of the effective sample for the bound
 
@@ -248,7 +249,8 @@ def evaluate(R, df, a, h, null=None):
         for lo, hi in [(0, 1), (1, 2), (2, 3), (3, 99)]:
             m = (df[col].values >= lo) & (df[col].values < hi); n = int(m.sum()); k = int(I[m].sum())
             reg[f"{name}_{lo}_{hi}"] = dict(n=n, k=k, rate=k / max(n, 1))
-    return dict(T=T, x=x, rate=x / T, p_uc=p_uc if h == 1 else p_uc_mc, p_uc_kupiec=p_uc,
+    qs = float(np.mean((I - a) * (R - y)))              # quantile (pinball) score at level a, A
+    return dict(T=T, x=x, rate=x / T, qscore=qs, p_uc=p_uc if h == 1 else p_uc_mc, p_uc_kupiec=p_uc,
                 p_uc_hac=p_uc_hac, p_uc_mc=p_uc_mc, p_dq_hac=p_dq_hac, ucb95=ucb, n_eff=n_eff, p_ind=ch["p_ind"], p_dq=p_dq,
                 episodes=int(rl.size), max_run=int(rl.max()) if rl.size else 0,
                 mag_med=float(np.nanmedian(mag)), mag_p95=float(np.nanpercentile(mag, 95)),
@@ -267,10 +269,14 @@ def main():
             f = causal(dfall, a)
             df = dfall.loc[f.index]
             f["QR+tracking"] = quantile_tracking(f["QR"].values, df["y"].values, df.index, a, h)
+            for eta in ETA_SENS:                              # sensitivity to the step size (v1.2.1)
+                f[f"QR+tracking_eta{eta:g}"] = quantile_tracking(f["QR"].values, df["y"].values,
+                                                                 df.index, a, h, eta=eta)
             null = mc_null(df, a, h) if h > 1 else None
             meths = {"Static": np.full(len(df), STATIC), "Seasonal": df["y_SEAS"].values,
                      "AAR": df["y_AAR"].values, "AAR881": df["y_AAR881"].values}
-            meths.update({k: f[k].values for k in RULES + ["InputRealDir"]})
+            meths.update({k: f[k].values for k in RULES + ["InputRealDir"]
+                          + [f"QR+tracking_eta{e:g}" for e in ETA_SENS]})
             for name, R in meths.items():
                 r = evaluate(np.asarray(R, float), df, a, h, null); r.update(method=name, h=h, alpha=a)
                 results.append(r)

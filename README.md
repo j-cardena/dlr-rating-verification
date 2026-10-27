@@ -10,7 +10,7 @@ Reproduction code and data provenance for
 
 The repository reproduces every computed result in the paper: the Kupiec non-rejection regions
 (Table 4), the clustering simulation (Section 4.4), and the two-site worked example (Section 5:
-Tables 6–9, Figure 1, the size simulation of Supplementary Table S2 and the sensitivity checks). It also contains the
+Tables 6–10, Figure 1, the size simulation of Supplementary Table S2, the power analysis and the sensitivity checks). It also contains the
 literature search strings, the screening of 176 Scopus records, and the full-text extraction sheet
 (Supplementary Table S1).
 
@@ -52,7 +52,7 @@ git clone <this repository> && cd dlr-rating-verification
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt && pip install -e .
 make data        # downloads Jena; prints instructions for the M2 export; checks SHA-256
-make all         # tests, simulations, both sites, Figure 1, Tables 6-9, comparison with expected/
+make all         # tests, simulations, both sites, Figure 1, Tables 6-10, comparison with expected/
 ```
 
 Outputs go to `out/`:
@@ -62,11 +62,12 @@ Outputs go to `out/`:
 | `out/table4_kupiec.txt` | Table 4 |
 | `out/cluster_simulation.txt` | Section 4.4 (false-rejection rates 23/37/54 %) |
 | `out/size_simulation.txt` | Supplementary Table S2 (test size, bound coverage) |
+| `out/power_analysis.txt` | Evidence needed for a one-sided safety test (Section 4.4) |
 | `out/{jena,m2_ew,m2_ns}/results.json`, `log.txt` | Tables 6–8 and all numbers in Section 5 |
 | `out/hac_bandwidth.txt` | Bandwidth sensitivity of the h = 24 tests (Section 5.2) |
 | `out/{jena,m2_ew,m2_ns}/diag_subhourly.txt`, `subhourly.json` | Table 9: reference definition within the hour |
 | `out/fig_regime.pdf`, `.csv` | Figure 1 and its data |
-| `out/table{6,7,8,9}_*_rows.tex` | LaTeX body rows of Tables 6–9 |
+| `out/table{6,7,8,9,10}_*_rows.tex` | LaTeX body rows of Tables 6–10 (Table 10: rule selection by criterion) |
 
 `make verify` compares the regenerated results with `expected/`. With the pinned versions in
 `requirements.txt` the results are identical; other BLAS or statsmodels builds may move an
@@ -89,7 +90,7 @@ Raw data are not redistributed; see [`data/README.md`](data/README.md).
 ```
 src/dlrverify/      ieee738.py (steady-state ampacity), vtests.py (coverage tests)
 scripts/            run_example.py, fig_regime2.py, make_tables.py, hac_bandwidth.py,
-                    diag_subhourly.py, size_sim.py, kupiec_table.py, cluster_sim.py, verify_results.py,
+                    diag_subhourly.py, size_sim.py, power_analysis.py, kupiec_table.py, cluster_sim.py, verify_results.py,
                     get_data.sh
 expected/           published results.json per site/orientation
 literature/         search_queries.md, screening_merged.csv, table_S1_extraction.csv

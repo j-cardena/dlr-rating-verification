@@ -1,4 +1,4 @@
-"""Write the LaTeX body rows of Tables 6-9 from results.json files (v1.2).
+"""Write the LaTeX body rows of Tables 6-10 from results.json files (v1.2.1).
 Usage: make_tables.py <jena dir> <m2_ew dir> <m2_ns dir> <outdir>"""
 import sys, json
 dirs, out = sys.argv[1:4], sys.argv[4]
@@ -53,4 +53,32 @@ for k, lab in [("QR", "QR"), ("QR+tracking", "QR + tracking"), ("Margin", "Media
     cells = [f"{S['rules'][k][c]*100:.2f}" for S in SUB for c in ("hourly", "mean10", "min10")]
     rows.append(lab + " & " + " & ".join(cells) + " \\\\")
 open(f"{out}/table9_reference_rows.tex", "w").write("\n".join(rows) + "\n")
-print("wrote table6_reference_rows.tex, table7_a01_rows.tex, table8_a05_rows.tex, table9_reference_rows.tex")
+# Table 10: which rule each evaluation criterion selects (pre-specified criteria)
+#   QS: lowest mean quantile score at alpha; coverage: frequency closest to alpha;
+#   safety-first: largest mean gain among rules whose one-sided 95 % bound is <= alpha
+#   (static and seasonal ratings included as candidates, so a fallback always exists).
+SHORT = {"Static": "Static", "Seasonal": "Seasonal", "AAR881": "AAR $+10\\,^\\circ$F",
+         "QR": "QR", "QR+tracking": "QR + tr.", "Margin": "Margin", "Input": "Input q.",
+         "Input45": "Input q.\\ 45$^\\circ$", "ProbAAR": "Prob.\\ AAR"}
+CAND = list(SHORT)
+SITES = ["Jena", "M2 E--W", "M2 N--S"]
+rows, summary = [], dict(cases=0, qs_unsafe=0, cov_unsafe=0, agree_qs=0)
+for a in (0.01, 0.05):
+    for h in (1, 24):
+        for site, R in zip(SITES, CASES):
+            rr = {m: get(R, m, h, a) for m in CAND}
+            qs = min(CAND, key=lambda m: rr[m]["qscore"])
+            cov = min(CAND, key=lambda m: abs(rr[m]["rate"] - a))
+            safe = [m for m in CAND if rr[m]["ucb95"] <= a]
+            sf = max(safe, key=lambda m: rr[m]["gain_vs_static"])
+            summary["cases"] += 1
+            summary["qs_unsafe"] += rr[qs]["ucb95"] > a
+            summary["cov_unsafe"] += rr[cov]["ucb95"] > a
+            summary["agree_qs"] += qs == sf
+            cell = lambda m: f"{SHORT[m]} ({rr[m]['ucb95']*100:.2f})"
+            rows.append(f"{a:.2f} & {h} & {site} & {cell(qs)} & {cell(cov)} & {SHORT[sf]} "
+                        f"({rr[sf]['ucb95']*100:.2f}; {g(rr[sf]['gain_vs_static'])}) \\\\")
+open(f"{out}/table10_selection_rows.tex", "w").write("\n".join(rows) + "\n")
+json.dump(summary, open(f"{out}/table10_summary.json", "w"), indent=1, default=int)
+print("wrote table6_reference_rows.tex, table7_a01_rows.tex, table8_a05_rows.tex, "
+      "table9_reference_rows.tex, table10_selection_rows.tex")

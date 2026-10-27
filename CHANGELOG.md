@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.1 (2026-10)
+- Quantile (pinball) score at alpha for every rule (`qscore` in results.json).
+- Table 10: rule selected by lowest quantile score, by coverage closest to alpha, and by a
+  safety-first criterion (largest gain with one-sided 95 % bound <= alpha). Pre-specified.
+- New `scripts/power_analysis.py`: forecasts needed for a one-sided bound below alpha.
+- Quantile-tracking step-size sensitivity (eta = 5 and 20 A) in results.json.
+- `literature/screening_merged.csv`: new "Evidence basis" column (full text / abstract).
+- No change to any number in Tables 4 and 6-9.
+
 ## 1.2.0 (2026-10)
 - Seasonal ratings without look-ahead: design temperatures from before the test period (M2: 2020;
   Jena: MPI-BGC roof station 2017-2019, files `data/raw/mpi_roof_201[789]*.csv`). Jena seasonal

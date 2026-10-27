@@ -19,7 +19,8 @@ test:
 sims: | $(OUT)
 	$(PY) scripts/kupiec_table.py   > $(OUT)/table4_kupiec.txt     # Table 4
 	$(PY) scripts/cluster_sim.py    > $(OUT)/cluster_simulation.txt # Section 4.4 simulation
-	$(PY) scripts/size_sim.py 2000  > $(OUT)/size_simulation.txt    # size of the coverage tests (Table S1)
+	$(PY) scripts/size_sim.py 2000  > $(OUT)/size_simulation.txt    # size of the coverage tests (Table S2)
+	$(PY) scripts/power_analysis.py > $(OUT)/power_analysis.txt     # evidence needed for a one-sided test (Section 4.4)
 
 jena: | $(OUT)
 	mkdir -p $(OUT)/jena
@@ -40,7 +41,7 @@ figures:
 	      $(OUT)/m2_ns/series_h1_a01.csv "M2, N–S line" $(OUT)/fig_regime.pdf   # Figure 1
 
 tables:
-	$(PY) scripts/make_tables.py $(OUT)/jena $(OUT)/m2_ew $(OUT)/m2_ns $(OUT)   # Tables 6-9, S1
+	$(PY) scripts/make_tables.py $(OUT)/jena $(OUT)/m2_ew $(OUT)/m2_ns $(OUT)   # Tables 6-10
 
 verify:
 	$(PY) scripts/verify_results.py $(OUT)/jena  expected/jena

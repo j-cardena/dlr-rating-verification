@@ -57,3 +57,15 @@ def test_upper_bound_reduces_to_clopper_pearson_and_widens_with_dependence():
     Ic = np.repeat(I[:500], 10)                      # same rate, hits in runs of 10
     ubc, nc = vt.upper_bound_eff(Ic, 95)
     assert nc < 1000 and ubc > vt.upper_bound_eff(Ic, 0)[0]
+
+
+def test_power_analysis_matches_normal_approximation():
+    import importlib.util, pathlib, io, contextlib
+    spec = importlib.util.spec_from_file_location(
+        "pa", pathlib.Path(__file__).parents[1] / "scripts" / "power_analysis.py")
+    pa = importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):
+        spec.loader.exec_module(pa)
+    n = pa.n_required(0.008, 0.01)
+    approx = (1.645 + 0.842) ** 2 * 0.01 * 0.99 / 0.002 ** 2      # one-sided z-test sample size
+    assert 0.8 * approx < n < 1.2 * approx
