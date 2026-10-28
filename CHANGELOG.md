@@ -1,6 +1,7 @@
 # Changelog
 
-## 1.3.0 (2026-10)
+## 1.3.0 (2026-10-28)
+- Version archived with the revised manuscript (Zenodo 10.5281/zenodo.23732605).
 - Causal split fixed at h > 1: each monthly refit now uses only pairs whose outcome was known at
   the issue time of the month's first forecast (target time <= that issue time). v1.2.1 trained
   on all pairs with targets in earlier months, so the first h - 1 forecasts of each month used
