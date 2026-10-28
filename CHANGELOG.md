@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 (2026-10)
 - Causal split fixed at h > 1: each monthly refit now uses only pairs whose outcome was known at
   the issue time of the month's first forecast (target time <= that issue time). v1.2.1 trained
   on all pairs with targets in earlier months, so the first h - 1 forecasts of each month used
@@ -12,10 +12,11 @@
 - `upper_bound_eff` with no hits: effective sample T / (1 + L), the largest design effect of the
   Bartlett estimator at bandwidth L, instead of the independent bound with the nominal T.
   No reported rule has zero hits.
-- Effect on the paper: h = 24 rows of Tables 7-8 at Jena change by up to 0.2 percentage points
+- Effect on the paper: h = 24 rows of Tables 10-11 at Jena change by up to 0.2 percentage points
   for the wind-informed rules and by 0.9 for the probabilistic AAR at alpha = 0.05
   (10.09 -> 9.23 %); at M2 frequencies change by at most 0.03 points and bounds in the second decimal.
-  Table 10 selects the same rule in all twelve cases. Tables 4, 6, 9 and S2 unchanged.
+  Table 13 selects the same rule in all twelve cases. Tables 6, 9, 12 and S2 unchanged
+  (manuscript numbering; files table7/8/10 and table4/6/9).
 - expected/ refreshed.
 
 ## 1.2.1 (2026-10)
