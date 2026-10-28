@@ -154,10 +154,15 @@ def qfit(df_tr, df_te, ycol, xcols, q):
 
 
 def causal(df, a):
-    """Forecasts for every test month from models fitted on all earlier months."""
+    """Forecasts for every test month (by target time) from models refitted at the issue time
+    of the month's first forecast, on the forecast-outcome pairs whose outcome was known by
+    then (target time <= that issue time). v1.2.1 trained on all pairs with targets in earlier
+    months, which at h > 1 let the first h - 1 forecasts of each month use outcomes realised
+    after their issue time."""
     out = []
     for mth in sorted(m for m in df.month.unique() if m >= FIRST_TEST):
-        tr, te = df[df.month < mth], df[df.month == mth]
+        te = df[df.month == mth]
+        tr = df[df.t_target <= te.index.min()]
         r = pd.DataFrame(index=te.index)
         r["QR"], _ = qfit(tr, te, "y", XA, a)
         med_te, med_tr = qfit(tr, te, "y", XA, 0.5)
@@ -194,19 +199,26 @@ def hourly(I, t):
     return s.reindex(pd.date_range(s.index.min(), s.index.max(), freq="h"), fill_value=0)
 
 
+def grid_pos(df):
+    """Position of each target time on the full hourly grid, so that lags in the dependence
+    calculations are elapsed hours, also across data gaps (M2, February-May 2021)."""
+    tt = pd.DatetimeIndex(df["t_target"].values)
+    return pd.date_range(tt.min(), tt.max(), freq="h").get_indexer(tt)
+
+
 def statistics(I, df, a, h):
     """HAC coverage z and dynamic quantile W for a hit series aligned with df."""
-    T = len(I); L = max(h - 1, 0)
-    p = I.mean(); H = I - a; v0 = a * (1 - a)
+    T = len(I); L = max(h - 1, 0); pos = grid_pos(df)
+    p = I.mean(); H = (I - a)[:, None]; v0 = a * (1 - a)
     for k in range(1, L + 1):
-        v0 += 2 * (1 - k / (L + 1)) * (H[k:] @ H[:-k]) / T
+        v0 += 2 * (1 - k / (L + 1)) * float(vt._lag_products(H, k, pos)[0, 0]) / T
     z = (p - a) / np.sqrt(max(v0, 1e-12) / T)
     tt = pd.DatetimeIndex(df["t_target"].values)
     Is = pd.Series(I, index=tt)
     lag = lambda k: Is.reindex(tt - pd.Timedelta(hours=k)).fillna(0).values
     lowV = (df["V0"].values < 1.0).astype(float)          # regime known at issue time
     X = np.column_stack([np.ones(T), lag(h), lag(2 * h), lowV, df["y_day"].values])
-    W, p_dq = vt.dq_hac(I, a, X, L)
+    W, p_dq = vt.dq_hac(I, a, X, L, pos)
     return abs(z), W, p_dq
 
 
@@ -229,11 +241,11 @@ def mc_null(df, a, h, reps=MC_REPS):
 
 def evaluate(R, df, a, h, null=None):
     y = df["y"].values; I = (R > y).astype(int); T = len(I); x = int(I.sum())
-    L = max(h - 1, 0)
-    rate, p_uc_hac, _ = vt.uc_hac(I, a, L)
-    ucb, n_eff = vt.upper_bound_eff(I, UB_BANDWIDTH)
+    L = max(h - 1, 0); pos = grid_pos(df)
+    rate, p_uc_hac, _ = vt.uc_hac(I, a, L, pos)
+    ucb, n_eff = vt.upper_bound_eff(I, UB_BANDWIDTH, pos=pos)
     lr_uc, p_uc = vt.kupiec(I, a)
-    ch = vt.christoffersen(I, a)
+    ch = vt.christoffersen(I, a, pos)
     zabs, W, p_dq_hac = statistics(I, df, a, h)
     if null is not None:                                   # Monte Carlo p-values (h > 1)
         p_uc_mc = (1 + np.sum(null[:, 0] >= zabs - 1e-12)) / (len(null) + 1)
@@ -262,12 +274,20 @@ RULES = ["QR", "QR+tracking", "Margin", "Input", "Input45", "ProbAAR"]
 
 
 def main():
-    results = []
+    results = []; lookahead = {}
     for h in HORIZONS:
         dfall = design(h)
         for a in ALPHAS:
             f = causal(dfall, a)
             df = dfall.loc[f.index]
+            if a == ALPHAS[0]:                                # forecasts the v1.2.1 split affected:
+                # issued before the last outcome of the previous month (one hour before the
+                # month's first target) was known; h - 1 per month, none at h = 1
+                first = df.groupby("month")["t_target"].transform("min")
+                n_la = int((df.index < first - pd.Timedelta(hours=1)).sum())
+                lookahead[h] = n_la
+                print(f"h={h:2d}: {n_la} test forecasts issued before their month's first target "
+                      f"(trained on later outcomes in v1.2.1)", flush=True)
             f["QR+tracking"] = quantile_tracking(f["QR"].values, df["y"].values, df.index, a, h)
             for eta in ETA_SENS:                              # sensitivity to the step size (v1.2.1)
                 f[f"QR+tracking_eta{eta:g}"] = quantile_tracking(f["QR"].values, df["y"].values,
@@ -306,6 +326,7 @@ def main():
                    n_test_hours=int(len(test)), first_test_month=FIRST_TEST,
                    mean_wind=float(ok["V"].mean()), frac_lowwind=float((ok["V"] < 1).mean()),
                    static_exceed=float((STATIC > ok["A"]).mean()),
+                   v121_lookahead_forecasts=lookahead,
                    aar881_wind_sensitivity=sens)
     json.dump(dict(summary=summary, results=results), open(f"{OUT}/results.json", "w"),
               indent=1, default=float)

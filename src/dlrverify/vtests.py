@@ -15,9 +15,14 @@ def kupiec(I, a):
     return lr, stats.chi2.sf(lr, 1)
 
 
-def christoffersen(I, a):
+def christoffersen(I, a, pos=None):
+    """First-order Markov test. With `pos` (positions on an hourly grid), only transitions
+    between consecutive hours are counted, so pairs that straddle a data gap are skipped."""
     I = np.asarray(I, int)
     i0, i1 = I[:-1], I[1:]
+    if pos is not None:
+        adj = np.diff(np.asarray(pos, int)) == 1
+        i0, i1 = i0[adj], i1[adj]
     n00 = np.sum((i0 == 0) & (i1 == 0)); n01 = np.sum((i0 == 0) & (i1 == 1))
     n10 = np.sum((i0 == 1) & (i1 == 0)); n11 = np.sum((i0 == 1) & (i1 == 1))
     p01 = n01 / max(n00 + n01, 1); p11 = n11 / max(n10 + n11, 1)
@@ -80,32 +85,48 @@ def kupiec_region(T, a, level=0.05):
 
 
 # ---------------------------------------------------------------- dependence-robust versions
-def newey_west(g, L):
+# The functions below take an optional `pos`: the position of each observation on a regular
+# hourly grid (e.g. DatetimeIndex.get_indexer on the full range of target times). With `pos`,
+# autocovariances are taken at elapsed-time lags and pairs that straddle a data gap are
+# skipped (gaps contribute zero; normalisation by the number of observations). Without
+# `pos`, consecutive array elements are treated as consecutive hours (v1.2.1 behaviour).
+
+def _lag_products(g, k, pos):
+    """sum_t g_t g_{t-k}^T over pairs exactly k grid steps apart (g: T x m)."""
+    if pos is None:
+        return g[k:].T @ g[:-k]
+    pos = np.asarray(pos, int)
+    full = np.zeros((pos.max() - pos.min() + 1, g.shape[1]))
+    full[pos - pos.min()] = g
+    return full[k:].T @ full[:-k]
+
+
+def newey_west(g, L, pos=None):
     """Bartlett-kernel long-run covariance of the rows of g (T x k), bandwidth L."""
     g = np.atleast_2d(np.asarray(g, float).T).T
     g = g - g.mean(0)
     T = g.shape[0]; S = g.T @ g / T
     for k in range(1, L + 1):
-        G = g[k:].T @ g[:-k] / T
+        G = _lag_products(g, k, pos) / T
         S = S + (1 - k / (L + 1)) * (G + G.T)
     return S
 
 
-def uc_hac(I, a, L):
+def uc_hac(I, a, L, pos=None):
     """Unconditional coverage with a HAC variance for overlapping h-step forecasts
     (bandwidth L >= h-1; lag-0 variance a(1-a) imposed under H0, autocovariances at lags
     1..L from the data with Bartlett weights). Returns (rate, two-sided p for H0: rate = a,
     one-sided 95% upper bound on the rate, using the data-based long-run variance)."""
-    I = np.asarray(I, float); T = I.size; p = I.mean(); H = I - a
+    I = np.asarray(I, float); T = I.size; p = I.mean(); H = (I - a)[:, None]
     v0 = a * (1 - a)
     for k in range(1, L + 1):
-        v0 += 2 * (1 - k / (L + 1)) * (H[k:] @ H[:-k]) / T
+        v0 += 2 * (1 - k / (L + 1)) * float(_lag_products(H, k, pos)[0, 0]) / T
     z = (p - a) / np.sqrt(max(v0, 1e-12) / T)
-    v1 = float(newey_west(I[:, None], L)[0, 0])
+    v1 = float(newey_west(I[:, None], L, pos)[0, 0])
     return p, 2 * stats.norm.sf(abs(z)), p + 1.645 * np.sqrt(max(v1, p * (1 - p)) / T)
 
 
-def dq_hac(I, a, X, L):
+def dq_hac(I, a, X, L, pos=None):
     """Dynamic quantile test as a moment test E[X_t (I_t - a)] = 0. The lag-0 covariance is
     imposed under H0, a(1-a) X'X/T, as in Engle and Manganelli (2004); for overlapping
     h-step forecasts the autocovariances at lags 1..L (L >= h-1) are added with Bartlett
@@ -114,24 +135,28 @@ def dq_hac(I, a, X, L):
     g = X * H[:, None]; T = g.shape[0]; m = g.mean(0)
     S = a * (1 - a) * X.T @ X / T
     for k in range(1, L + 1):
-        G = g[k:].T @ g[:-k] / T
+        G = _lag_products(g, k, pos) / T
         S = S + (1 - k / (L + 1)) * (G + G.T)
     W = T * m @ np.linalg.pinv(S) @ m
     return W, stats.chi2.sf(W, g.shape[1])
 
 
-def upper_bound_eff(I, L=95, conf=0.95):
+def upper_bound_eff(I, L=95, conf=0.95, pos=None):
     """One-sided upper confidence bound on the exceedance rate for a dependent hit sequence:
     Clopper-Pearson bound computed with an effective sample size n_eff = T p(1-p) / v_LR,
     where v_LR is the Bartlett long-run variance at bandwidth L (Korn and Graubard, 1998,
     design-effect adjustment). With L = 0, n_eff = T and the exact Clopper-Pearson bound is
-    returned. Returns (bound, n_eff)."""
+    returned. A record with no hits carries no information about their clustering, so it is
+    given the largest design effect the Bartlett estimator can produce at bandwidth L,
+    1 + L (hits perfectly persistent up to lag L), rather than assumed independent.
+    Returns (bound, n_eff)."""
     I = np.asarray(I, float); T = I.size; p = I.mean(); x = I.sum()
     if x == 0:
-        return float(1 - (1 - conf) ** (1 / T)), float(T)
+        n_eff = T / (1 + L)
+        return float(1 - (1 - conf) ** (1 / n_eff)), float(n_eff)
     if L == 0:
         return float(stats.beta.ppf(conf, x + 1, T - x)), float(T)
-    vlr = float(newey_west(I[:, None], L)[0, 0])
+    vlr = float(newey_west(I[:, None], L, pos)[0, 0])
     n_eff = min(T, T * p * (1 - p) / max(vlr, 1e-12))
     x_eff = p * n_eff
     return float(stats.beta.ppf(conf, x_eff + 1, n_eff - x_eff)), float(n_eff)

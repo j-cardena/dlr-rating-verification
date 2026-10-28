@@ -69,3 +69,33 @@ def test_power_analysis_matches_normal_approximation():
     n = pa.n_required(0.008, 0.01)
     approx = (1.645 + 0.842) ** 2 * 0.01 * 0.99 / 0.002 ** 2      # one-sided z-test sample size
     assert 0.8 * approx < n < 1.2 * approx
+
+
+def test_grid_positions_without_gaps_change_nothing():
+    rng = np.random.default_rng(7)
+    I = np.repeat((rng.random(400) < 0.02).astype(int), 6)
+    X = np.column_stack([np.ones(I.size), rng.random(I.size) < 0.1])
+    pos = np.arange(I.size) + 50                      # contiguous grid, arbitrary offset
+    assert abs(vt.uc_hac(I, 0.01, 23)[1] - vt.uc_hac(I, 0.01, 23, pos)[1]) < 1e-12
+    assert abs(vt.dq_hac(I, 0.01, X, 23)[0] - vt.dq_hac(I, 0.01, X, 23, pos)[0]) < 1e-9
+    assert vt.upper_bound_eff(I, 95) == vt.upper_bound_eff(I, 95, pos=pos)
+    assert vt.christoffersen(I, 0.01)["lr_ind"] == vt.christoffersen(I, 0.01, pos)["lr_ind"]
+
+
+def test_pairs_across_a_gap_are_skipped():
+    I = np.zeros(200, int); I[99] = I[100] = 1        # adjacent in the array...
+    pos = np.r_[np.arange(100), np.arange(100) + 1000]  # ...but 901 h apart in time
+    ch = vt.christoffersen(I, 0.01, pos)
+    assert ch["pi11"] == 0.0                          # no 1 -> 1 transition is counted
+    assert vt.christoffersen(I, 0.01)["pi11"] == 0.5   # 1 -> 1 then 1 -> 0 without positions
+    n_gap = vt.upper_bound_eff(I, 5, pos=pos)[1]
+    n_arr = vt.upper_bound_eff(I, 5)[1]
+    assert n_gap > n_arr                              # the two hits are no longer a run
+
+
+def test_zero_hits_use_the_largest_bartlett_design_effect():
+    T, L = 5000, 95
+    ub, n = vt.upper_bound_eff(np.zeros(T, int), L)
+    assert n == T / (1 + L)
+    assert abs(ub - (1 - 0.05 ** (1 / n))) < 1e-12
+    assert ub > vt.upper_bound_eff(np.zeros(T, int), 0)[0]   # wider than the independent bound

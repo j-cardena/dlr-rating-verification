@@ -11,5 +11,6 @@ for f in sys.argv[1:]:
         Is = pd.Series(I, index=tt)
         lag = lambda q: Is.reindex(tt - pd.Timedelta(hours=q)).fillna(0).values
         X = np.column_stack([np.ones(len(I)), lag(h), lag(2 * h), (d["V0"].values < 1).astype(float), d["y_day"].values])
-        cells = [f"L={L}: pUC {vt.uc_hac(I, a, L)[1]:.3f} pDQ {vt.dq_hac(I, a, X, L)[1]:.3f}" for L in (23, 47, 95)]
+        pos = pd.date_range(tt.min(), tt.max(), freq="h").get_indexer(tt)   # elapsed-hour lags across gaps
+        cells = [f"L={L}: pUC {vt.uc_hac(I, a, L, pos)[1]:.3f} pDQ {vt.dq_hac(I, a, X, L, pos)[1]:.3f}" for L in (23, 47, 95)]
         print(f"{f} {k:12s} " + " | ".join(cells))
