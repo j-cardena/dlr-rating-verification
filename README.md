@@ -76,7 +76,7 @@ right gives the numbering of the submitted manuscript.
 | `out/size_simulation.txt` | Supplementary Table S2 (test size, bound coverage) |
 | `out/power_analysis.txt` | Evidence needed for a one-sided safety test (Section 4.4) |
 | `out/{jena,m2_ew,m2_ns}/results.json`, `log.txt` | Tables 9–11 and all numbers in Section 5 |
-| `out/hac_bandwidth.txt` | Bandwidth sensitivity of the h = 24 tests (Section 5.2) |
+| `out/hac_bandwidth.txt` | Bandwidth sensitivity of the asymptotic h = 24 tests (diagnostic; not reported in the manuscript, which uses Monte Carlo p-values) |
 | `out/{jena,m2_ew,m2_ns}/diag_subhourly.txt`, `subhourly.json` | Table 12: reference definition within the hour |
 | `out/fig_regime.pdf`, `.csv` | Figure 2 and its data |
 | `out/table{6,7,8,9,10}_*_rows.tex` | LaTeX body rows of Tables 9–13 (`table10_*`: Table 13, rule selection by criterion) |

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 (2026-10-29)
+- Table S1 extraction sheet: working notes removed; Fan2016 row replaced by Fan2017 (TPWRD 2017).
+- README: output-to-manuscript mapping corrected (bandwidth sensitivity is a diagnostic, not reported
+  in the manuscript since v1.2).
+- No change to code or to any computed result.
+
 ## 1.3.0 (2026-10-28)
 - Version archived with the revised manuscript (Zenodo 10.5281/zenodo.23732605).
 - Causal split fixed at h > 1: each monthly refit now uses only pairs whose outcome was known at
