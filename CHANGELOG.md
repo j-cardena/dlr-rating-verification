@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.3.1 (2026-10-29)
+- Version archived with the submitted manuscript (Zenodo 10.5281/zenodo.23775485).
 - Table S1 extraction sheet: working notes removed; Fan2016 row replaced by Fan2017 (TPWRD 2017).
 - README: output-to-manuscript mapping corrected (bandwidth sensitivity is a diagnostic, not reported
   in the manuscript since v1.2).

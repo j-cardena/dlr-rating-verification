@@ -8,9 +8,9 @@ Reproduction code and data provenance for
 > Uncertainty Quantification, Verification, and Risk-Based Use of Ambient-Adjusted and Dynamic
 > Ratings," *Forecasting* (MDPI), 2026 (under review).
 
-The badge above is the concept DOI, which resolves to the latest version. Version 1.3.0, which
-reproduces the revised manuscript, is archived as
-[10.5281/zenodo.23732605](https://doi.org/10.5281/zenodo.23732605).
+The badge above is the concept DOI, which resolves to the latest version. Version 1.3.1, which
+reproduces the submitted manuscript, is archived as
+[10.5281/zenodo.23775485](https://doi.org/10.5281/zenodo.23775485).
 
 The repository reproduces every computed result in the paper: the Kupiec non-rejection regions
 (Table 6), the clustering simulation (Section 4.4), and the two-site worked example (Section 5:
