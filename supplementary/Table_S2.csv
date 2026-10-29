@@ -1,0 +1,17 @@
+design,alpha,h,T,uc_test,uc_rejection_rate_pct,dq_rejection_rate_pct,upper_bound_coverage_pct
+overlap only (MA(h-1); independent at h = 1),0.01,1,5933,Kupiec,3.9,5.5,96.7
+overlap only (MA(h-1); independent at h = 1),0.05,1,5933,Kupiec,4.0,4.5,96.6
+overlap only (MA(h-1); independent at h = 1),0.01,1,7344,Kupiec,5.2,6.5,96.0
+overlap only (MA(h-1); independent at h = 1),0.05,1,7344,Kupiec,4.6,4.8,95.5
+overlap only (MA(h-1); independent at h = 1),0.01,24,5910,"HAC (Newey-West, asymptotic)",12.6,17.2,90.9
+overlap only (MA(h-1); independent at h = 1),0.05,24,5910,"HAC (Newey-West, asymptotic)",10.1,23.6,93.9
+overlap only (MA(h-1); independent at h = 1),0.01,24,7321,"HAC (Newey-West, asymptotic)",12.4,15.1,91.9
+overlap only (MA(h-1); independent at h = 1),0.05,24,7321,"HAC (Newey-West, asymptotic)",9.4,22.0,94.7
+overlap plus AR(1) persistence (rho = 0.95),0.01,1,5933,Kupiec,30.3,,90.5
+overlap plus AR(1) persistence (rho = 0.95),0.05,1,5933,Kupiec,45.1,,92.5
+overlap plus AR(1) persistence (rho = 0.95),0.01,1,7344,Kupiec,31.7,,91.0
+overlap plus AR(1) persistence (rho = 0.95),0.05,1,7344,Kupiec,44.6,,91.2
+overlap plus AR(1) persistence (rho = 0.95),0.01,24,5910,"HAC (Newey-West, asymptotic)",13.5,,91.7
+overlap plus AR(1) persistence (rho = 0.95),0.05,24,5910,"HAC (Newey-West, asymptotic)",11.8,,93.6
+overlap plus AR(1) persistence (rho = 0.95),0.01,24,7321,"HAC (Newey-West, asymptotic)",12.0,,92.3
+overlap plus AR(1) persistence (rho = 0.95),0.05,24,7321,"HAC (Newey-West, asymptotic)",12.3,,93.3
