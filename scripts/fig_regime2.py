@@ -11,7 +11,7 @@ fig, axs = plt.subplots(2, 2, figsize=(7.2, 5.6), sharey=True)
 rows = []
 for r, (f, site) in enumerate([(fa, la), (fb, lb)]):
     s = pd.read_csv(f, index_col=0, parse_dates=True)
-    for c, (col, title) in enumerate([("V0", "regime at issue time"), ("y_V", "realised regime at target")]):
+    for c, (col, title) in enumerate([("V0", "regime at issue time"), ("y_V", "realized regime at target")]):
         ax = axs[r, c]; cat = pd.cut(s[col], bins, labels=labels, right=False)
         for j, (m, lab, mk) in enumerate(meths):
             I = (s[m] > s["y"]).astype(int).values
